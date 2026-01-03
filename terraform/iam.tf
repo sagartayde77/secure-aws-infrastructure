@@ -75,3 +75,8 @@ resource "aws_iam_role_policy_attachment" "ec2_kms" {
   policy_arn = "arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser"
 }
 
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "secure-aws-infra-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
