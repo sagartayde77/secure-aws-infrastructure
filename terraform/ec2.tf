@@ -1,20 +1,32 @@
 # VPN / Bastion EC2 (Public)
 
 resource "aws_instance" "vpn_ec2" {
-  ami                    = var.amazon_linux_ami
-  instance_type           = "t2.micro"
-  subnet_id               = aws_subnet.public.id
-  vpc_security_group_ids  = [aws_security_group.vpn_sg.id]
+  ami                         = var.amazon_linux_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.vpn_sg.id]
   associate_public_ip_address = true
+
+  # SSH key pair
+  key_name = "server-key"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
- root_block_device {
-  volume_size = 10
-  volume_type = "gp3"
-  encrypted   = true
-  kms_key_id  = aws_kms_key.project_kms.arn
-}
+  user_data = <<-EOF
+    #!/bin/bash
+    mkdir -p /home/ec2-user/.ssh
+    echo "${var.ssh_public_key}" >> /home/ec2-user/.ssh/authorized_keys
+    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+    chmod 700 /home/ec2-user/.ssh
+    chmod 600 /home/ec2-user/.ssh/authorized_keys
+  EOF
+
+  root_block_device {
+    volume_size = 10
+    volume_type = "gp3"
+    encrypted   = true
+    kms_key_id  = aws_kms_key.project_kms.arn
+  }
 
   tags = {
     Name        = "secure-aws-infra-vpn-ec2"
@@ -27,20 +39,32 @@ resource "aws_instance" "vpn_ec2" {
 # Private App EC2
 
 resource "aws_instance" "private_ec2" {
-  ami                    = var.amazon_linux_ami
-  instance_type           = "t2.micro"
-  subnet_id               = aws_subnet.private.id
-  vpc_security_group_ids  = [aws_security_group.app_sg.id]
+  ami                         = var.amazon_linux_ami
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.private.id
+  vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = false
+
+  # SSH key pair
+  key_name = "server-key"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
-root_block_device {
-  volume_size = 10
-  volume_type = "gp3"
-  encrypted   = true
-  kms_key_id  = aws_kms_key.project_kms.arn
-}
+  user_data = <<-EOF
+    #!/bin/bash
+    mkdir -p /home/ec2-user/.ssh
+    echo "${var.ssh_public_key}" >> /home/ec2-user/.ssh/authorized_keys
+    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
+    chmod 700 /home/ec2-user/.ssh
+    chmod 600 /home/ec2-user/.ssh/authorized_keys
+  EOF
+
+  root_block_device {
+    volume_size = 10
+    volume_type = "gp3"
+    encrypted   = true
+    kms_key_id  = aws_kms_key.project_kms.arn
+  }
 
   tags = {
     Name        = "secure-aws-infra-private-ec2"
