@@ -1,3 +1,8 @@
 # Example SSH public key
+
 # Replace this with your own public key before applying
+
 ssh_public_key = "ssh-rsa AAAA_REPLACE_WITH_YOUR_PUBLIC_KEY"
+
+ssh_allowed_cidr = "x.x.x.x/32"
+

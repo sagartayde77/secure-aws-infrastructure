@@ -32,4 +32,9 @@ variable "ssh_public_key" {
   type        = string
 }
 
+variable "ssh_allowed_cidr" {
+  description = "CIDR block allowed to SSH into bastion"
+  type        = string
+}
+
 

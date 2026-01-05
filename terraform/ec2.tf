@@ -8,19 +8,10 @@ resource "aws_instance" "vpn_ec2" {
   associate_public_ip_address = true
 
   # SSH key pair
-  key_name = "server-key"
+  key_name = "secure-aws-infra-key"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  user_data = <<-EOF
-    #!/bin/bash
-    mkdir -p /home/ec2-user/.ssh
-    echo "${var.ssh_public_key}" >> /home/ec2-user/.ssh/authorized_keys
-    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-    chmod 700 /home/ec2-user/.ssh
-    chmod 600 /home/ec2-user/.ssh/authorized_keys
-  EOF
-
+  
   root_block_device {
     volume_size = 10
     volume_type = "gp3"
@@ -46,18 +37,9 @@ resource "aws_instance" "private_ec2" {
   associate_public_ip_address = false
 
   # SSH key pair
-  key_name = "server-key"
+  key_name = "secure-aws-infra-key"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  user_data = <<-EOF
-    #!/bin/bash
-    mkdir -p /home/ec2-user/.ssh
-    echo "${var.ssh_public_key}" >> /home/ec2-user/.ssh/authorized_keys
-    chown -R ec2-user:ec2-user /home/ec2-user/.ssh
-    chmod 700 /home/ec2-user/.ssh
-    chmod 600 /home/ec2-user/.ssh/authorized_keys
-  EOF
 
   root_block_device {
     volume_size = 10
