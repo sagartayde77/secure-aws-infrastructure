@@ -11,7 +11,7 @@ resource "aws_instance" "vpn_ec2" {
   key_name = "secure-aws-infra-key"
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-  
+
   root_block_device {
     volume_size = 10
     volume_type = "gp3"
