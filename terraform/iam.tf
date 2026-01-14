@@ -1,82 +1,115 @@
-# Project IAM User
-resource "aws_iam_user" "project_user" {
-  name = "${var.project_name}-user"
-}
+########################################
+# IAM Role – Public EC2 (SSM ONLY)
+########################################
+resource "aws_iam_role" "public_ssm" {
+  name = "${var.project_name}-public-ssm-role"
 
-# IAM Role for the Project
-data "aws_iam_policy_document" "project_role_trust" {
-  statement {
-    effect = "Allow"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
 
-    principals {
-      type        = "AWS"
-      identifiers = [aws_iam_user.project_user.arn]
-    }
-
-    actions = ["sts:AssumeRole"]
+  tags = {
+    Name    = "${var.project_name}-public-ssm-role"
+    Project = var.project_name
   }
 }
 
-# Create the Role
-resource "aws_iam_role" "project_role" {
-  name               = "${var.project_name}-role"
-  assume_role_policy = data.aws_iam_policy_document.project_role_trust.json
+########################################
+# Attach AWS-managed SSM policy (Public)
+########################################
+resource "aws_iam_role_policy_attachment" "public_ssm" {
+  role       = aws_iam_role.public_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Permissions to the role (AWS Managed)
-resource "aws_iam_role_policy_attachment" "ec2_full" {
-  role       = aws_iam_role.project_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+########################################
+# Instance Profile – Public EC2
+########################################
+resource "aws_iam_instance_profile" "public_ssm" {
+  name = "${var.project_name}-public-ssm-profile"
+  role = aws_iam_role.public_ssm.name
 }
 
-resource "aws_iam_role_policy_attachment" "s3_full" {
-  role       = aws_iam_role.project_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
-}
+########################################
+# IAM Role – Private EC2 (S3 + optional SSM)
+########################################
+resource "aws_iam_role" "private_ec2" {
+  name = "${var.project_name}-private-ec2-role"
 
-resource "aws_iam_role_policy_attachment" "kms_full" {
-  role       = aws_iam_role.project_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser"
-}
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
 
-resource "aws_iam_role_policy_attachment" "vpc_readonly" {
-  role       = aws_iam_role.project_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess"
-}
-
-# EC2 Instance Role
-data "aws_iam_policy_document" "ec2_trust" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
+  tags = {
+    Name    = "${var.project_name}-private-ec2-role"
+    Project = var.project_name
   }
 }
 
-# Create EC2 role
-resource "aws_iam_role" "ec2_role" {
-  name               = "${var.project_name}-ec2-role"
-  assume_role_policy = data.aws_iam_policy_document.ec2_trust.json
+########################################
+# (Optional but Recommended) SSM for Private EC2
+########################################
+resource "aws_iam_role_policy_attachment" "private_ssm" {
+  role       = aws_iam_role.private_ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Attach S3+KMS permissions
-resource "aws_iam_role_policy_attachment" "ec2_s3" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+########################################
+# Custom S3 Access Policy (Private EC2)
+########################################
+resource "aws_iam_policy" "private_s3_access" {
+  name        = "${var.project_name}-private-s3-access"
+  description = "Allow private EC2 to access encrypted S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.app.arn,
+          "${aws_s3_bucket.app.arn}/*"
+        ]
+      }
+    ]
+  })
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_kms" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSKeyManagementServicePowerUser"
+########################################
+# Attach S3 policy to Private EC2 role
+########################################
+resource "aws_iam_role_policy_attachment" "private_s3" {
+  role       = aws_iam_role.private_ec2.name
+  policy_arn = aws_iam_policy.private_s3_access.arn
 }
 
-resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "secure-aws-infra-ec2-profile"
-  role = aws_iam_role.ec2_role.name
+########################################
+# Instance Profile – Private EC2
+########################################
+resource "aws_iam_instance_profile" "private_ec2" {
+  name = "${var.project_name}-private-ec2-profile"
+  role = aws_iam_role.private_ec2.name
 }
-

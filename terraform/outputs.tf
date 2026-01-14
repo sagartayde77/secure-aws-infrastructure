@@ -1,19 +1,17 @@
-output "vpc_id" {
-  value = aws_vpc.main.id
+########################################
+# Public VPN / Bastion EC2 Outputs
+########################################
+
+output "public_vpn_public_ip" {
+  description = "Public IP address of the VPN / Bastion EC2 (used for initial access)"
+  value       = aws_instance.public_vpn.public_ip
 }
 
-output "public_subnet_id" {
-  value = aws_subnet.public.id
-}
+########################################
+# Private Application EC2 Outputs
+########################################
 
-output "private_subnet_id" {
-  value = aws_subnet.private.id
-}
-
-output "kms_key_id" {
-  value = aws_kms_key.project_kms.key_id
-}
-
-output "kms_key_arn" {
-  value = aws_kms_key.project_kms.arn
+output "private_app_instance_id" {
+  description = "Instance ID of the private application EC2"
+  value       = aws_instance.private_app.id
 }

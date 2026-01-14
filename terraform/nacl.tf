@@ -1,108 +1,111 @@
-# Public Subnet NACL
-resource "aws_network_acl" "public_nacl" {
-  vpc_id = aws_vpc.main.id
-
-  subnet_ids = [
-    aws_subnet.public.id
-  ]
+##########################################################
+# Public Subnet NACL – VPN / Bastion
+##########################################################
+resource "aws_network_acl" "public" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = [aws_subnet.public.id]
 
   tags = {
-    Name    = "public-nacl"
-    Project = "secure-aws-infrastructure"
+    Name        = "${var.project_name}-public-nacl"
+    Environment = "public"
+    Project     = var.project_name
+  }
+
+  ##########################################################
+  # Inbound Rules
+  ##########################################################
+
+  # WireGuard VPN (UDP)
+  ingress {
+    rule_no    = 100
+    protocol   = "udp"
+    from_port  = var.wireguard_port
+    to_port    = var.wireguard_port
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Ephemeral UDP ports (VPN return traffic)
+  ingress {
+    rule_no    = 110
+    protocol   = "udp"
+    from_port  = 1024
+    to_port    = 65535
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  # Ephemeral TCP ports (SSM / updates)
+  ingress {
+    rule_no    = 120
+    protocol   = "tcp"
+    from_port  = 1024
+    to_port    = 65535
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
+
+  ##########################################################
+  # Outbound Rules
+  ##########################################################
+  egress {
+    rule_no    = 100
+    protocol   = "-1"
+    from_port  = 0
+    to_port    = 0
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
   }
 }
 
-# Inbound: Allow SSH & HTTP/HTTPS (from anywhere)
-resource "aws_network_acl_rule" "public_in_ssh" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 100
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 22
-  to_port        = 22
-  egress         = false
-}
-
-resource "aws_network_acl_rule" "public_in_http_https" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 110
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 80
-  to_port        = 443
-  egress         = false
-}
-
-# Outbound: Allow all
-resource "aws_network_acl_rule" "public_out_all" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 100
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  egress         = true
-}
-
-# Public Inbound ephemeral rule
-resource "aws_network_acl_rule" "public_in_ephemeral" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 120
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 1024
-  to_port        = 65535
-  egress         = false
-}
-
-#####################################################################
-
-# Private Subnet NACL
-resource "aws_network_acl" "private_nacl" {
-  vpc_id = aws_vpc.main.id
-
-  subnet_ids = [
-    aws_subnet.private.id
-  ]
+##########################################################
+# Private Subnet NACL – Application (SSM compatible)
+##########################################################
+resource "aws_network_acl" "private" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = [aws_subnet.private.id]
 
   tags = {
-    Name    = "private-nacl"
-    Project = "secure-aws-infrastructure"
+    Name        = "${var.project_name}-private-nacl"
+    Environment = "private"
+    Project     = var.project_name
   }
-}
 
-# Inbound: Allow SSH from public subnet only
-resource "aws_network_acl_rule" "private_in_ssh" {
-  network_acl_id = aws_network_acl.private_nacl.id
-  rule_number    = 100
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = aws_subnet.public.cidr_block
-  from_port      = 22
-  to_port        = 22
-  egress         = false
-}
+  ############################
+  # Inbound Rules
+  ############################
 
-# Outbound: Allow all (for NAT / updates)
-resource "aws_network_acl_rule" "private_out_all" {
-  network_acl_id = aws_network_acl.private_nacl.id
-  rule_number    = 100
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  egress         = true
-}
+  # Allow return traffic from NAT / AWS services (SSM)
+  ingress {
+    rule_no    = 100
+    protocol   = "tcp"
+    from_port  = 1024
+    to_port    = 65535
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
 
-# Private Inbound ephemeral rule
-resource "aws_network_acl_rule" "private_in_ephemeral" {
-  network_acl_id = aws_network_acl.private_nacl.id
-  rule_number    = 120
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 1024
-  to_port        = 65535
-  egress         = false
+  # Allow internal VPC traffic
+  ingress {
+    rule_no    = 110
+    protocol   = "-1"
+    from_port  = 0
+    to_port    = 0
+    cidr_block = var.vpc_cidr
+    action     = "allow"
+  }
+
+  ############################
+  # Outbound Rules
+  ############################
+
+  # Allow outbound internet (SSM → NAT → AWS)
+  egress {
+    rule_no    = 100
+    protocol   = "-1"
+    from_port  = 0
+    to_port    = 0
+    cidr_block = "0.0.0.0/0"
+    action     = "allow"
+  }
 }

@@ -1,40 +1,71 @@
-variable "aws_region" {
+########################################
+# Global / Provider
+########################################
+
+variable "region" {
   description = "AWS region where resources will be created"
   type        = string
-  default     = "ap-south-1"
 }
 
 variable "project_name" {
-  description = "Project name used for resource tagging"
+  description = "Project name used for resource naming"
   type        = string
-  default     = "secure-aws-infra"
 }
+
+variable "environment" {
+  description = "Deployment environment (e.g. dev, test, prod)"
+  type        = string
+}
+
+########################################
+# Networking
+########################################
 
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
-  default     = "10.0.0.0/16"
 }
 
-variable "amazon_linux_ami" {
-  description = "Amazon Linux 2 AMI ID for ap-south-1"
+variable "public_subnet_cidr" {
+  description = "CIDR block for the public subnet"
   type        = string
 }
+
+variable "private_subnet_cidr" {
+  description = "CIDR block for the private subnet"
+  type        = string
+}
+
+########################################
+# EC2
+########################################
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type for public VPN and private app EC2"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key for EC2 access"
-  type        = string
+########################################
+# WireGuard VPN
+########################################
+
+variable "wireguard_port" {
+  description = "UDP port for WireGuard VPN"
+  type        = number
+  default     = 51820
 }
 
-variable "ssh_allowed_cidr" {
-  description = "CIDR block allowed to SSH into bastion"
-  type        = string
+variable "vpn_allowed_cidrs" {
+  description = "CIDR blocks allowed to access WireGuard VPN"
+  type        = list(string)
 }
 
+########################################
+# S3
+########################################
 
+variable "s3_bucket_name" {
+  description = "Globally unique S3 bucket name for application data"
+  type        = string
+}

@@ -1,69 +1,98 @@
+########################################
+# Availability Zones (Portable)
+########################################
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+########################################
 # VPC
+########################################
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
-    Name = "${var.project_name}-vpc"
+    Name    = "${var.project_name}-vpc"
+    Project = var.project_name
   }
 }
 
+########################################
 # Internet Gateway
+########################################
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-igw"
+    Name    = "${var.project_name}-igw"
+    Project = var.project_name
   }
 }
 
-# Public Subnet(VPN + NAT)
+########################################
+# Public Subnet
+########################################
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "${var.aws_region}a"
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-public-subnet"
+    Name        = "${var.project_name}-public-subnet"
+    Environment = "public"
+    Project     = var.project_name
   }
 }
 
-# Private Subnet (App EC2)
+########################################
+# Private Subnet
+########################################
 resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.2.0/24"
-  availability_zone = "${var.aws_region}a"
+  cidr_block        = var.private_subnet_cidr
+  availability_zone = data.aws_availability_zones.available.names[0]
 
   tags = {
-    Name = "${var.project_name}-private-subnet"
+    Name        = "${var.project_name}-private-subnet"
+    Environment = "private"
+    Project     = var.project_name
   }
 }
 
-# Elastic IP (for NAT)
-resource "aws_eip" "nat_eip" {
+########################################
+# Elastic IP for NAT Gateway
+########################################
+resource "aws_eip" "nat" {
   domain = "vpc"
 
   tags = {
-    Name = "${var.project_name}-nat-eip"
+    Name    = "${var.project_name}-nat-eip"
+    Project = var.project_name
   }
 }
 
-# NAT Gateway
+########################################
+# NAT Gateway (Public Subnet)
+########################################
 resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat_eip.id
+  allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public.id
 
-  tags = {
-    Name = "${var.project_name}-nat-gateway"
-  }
-
   depends_on = [aws_internet_gateway.igw]
+
+  tags = {
+    Name    = "${var.project_name}-nat-gateway"
+    Project = var.project_name
+  }
 }
 
+########################################
 # Public Route Table
-resource "aws_route_table" "public_rt" {
+########################################
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -72,12 +101,15 @@ resource "aws_route_table" "public_rt" {
   }
 
   tags = {
-    Name = "${var.project_name}-public-rt"
+    Name    = "${var.project_name}-public-rt"
+    Project = var.project_name
   }
 }
 
+########################################
 # Private Route Table
-resource "aws_route_table" "private_rt" {
+########################################
+resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -86,17 +118,20 @@ resource "aws_route_table" "private_rt" {
   }
 
   tags = {
-    Name = "${var.project_name}-private-rt"
+    Name    = "${var.project_name}-private-rt"
+    Project = var.project_name
   }
 }
 
+########################################
 # Route Table Associations
-resource "aws_route_table_association" "public_assoc" {
+########################################
+resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
-  route_table_id = aws_route_table.public_rt.id
+  route_table_id = aws_route_table.public.id
 }
 
-resource "aws_route_table_association" "private_assoc" {
+resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private.id
-  route_table_id = aws_route_table.private_rt.id
+  route_table_id = aws_route_table.private.id
 }

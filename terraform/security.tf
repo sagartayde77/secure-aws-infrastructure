@@ -1,18 +1,27 @@
-# Security Group for VPN EC2 (Public)
-resource "aws_security_group" "vpn_sg" {
-  name        = "${var.project_name}-vpn-sg"
-  description = "Security group for VPN EC2 (public)"
+########################################
+# Security Group – Public VPN / Bastion EC2
+########################################
+resource "aws_security_group" "public" {
+  name        = "${var.project_name}-public-vpn-sg"
+  description = "Security group for WireGuard VPN / Bastion EC2"
   vpc_id      = aws_vpc.main.id
 
+  ####################################
+  # WireGuard VPN (UDP)
+  ####################################
   ingress {
-    description = "SSH access from trusted IP"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.ssh_allowed_cidr] #restricted to local system
+    description = "WireGuard VPN access"
+    from_port   = var.wireguard_port
+    to_port     = var.wireguard_port
+    protocol    = "udp"
+    cidr_blocks = var.vpn_allowed_cidrs
   }
 
+  ####################################
+  # Outbound traffic
+  ####################################
   egress {
+    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -20,25 +29,36 @@ resource "aws_security_group" "vpn_sg" {
   }
 
   tags = {
-    Name = "${var.project_name}-vpn-sg"
+    Name        = "${var.project_name}-public-vpn-sg"
+    Environment = "public"
+    Project     = var.project_name
   }
 }
 
-#Security Group for App EC2 (Private)
-resource "aws_security_group" "app_sg" {
-  name        = "${var.project_name}-app-sg"
-  description = "Security group for private EC2 (app)"
+########################################
+# Security Group – Private Application EC2
+########################################
+resource "aws_security_group" "private" {
+  name        = "${var.project_name}-private-app-sg"
+  description = "Security group for private application EC2"
   vpc_id      = aws_vpc.main.id
 
+  ####################################
+  # Allow traffic ONLY from VPN SG
+  ####################################
   ingress {
-    description     = "SSH only from VPN EC2"
-    from_port       = 22
-    to_port         = 22
-    protocol        = "tcp"
-    security_groups = [aws_security_group.vpn_sg.id]
+    description     = "Allow traffic from VPN EC2 only"
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [aws_security_group.public.id]
   }
 
+  ####################################
+  # Outbound traffic (via NAT)
+  ####################################
   egress {
+    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -46,6 +66,8 @@ resource "aws_security_group" "app_sg" {
   }
 
   tags = {
-    Name = "${var.project_name}-app-sg"
+    Name        = "${var.project_name}-private-app-sg"
+    Environment = "private"
+    Project     = var.project_name
   }
 }

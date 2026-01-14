@@ -1,22 +1,32 @@
-# Random suffix for global uniqueness
-resource "random_id" "bucket_id" {
-  byte_length = 4
-}
-
-# Private S3 Bucket
-resource "aws_s3_bucket" "secure_bucket" {
-  bucket        = "secure-aws-infra-${random_id.bucket_id.hex}"
-  force_destroy = true
+########################################
+# S3 Bucket – Private Application Data
+########################################
+resource "aws_s3_bucket" "app" {
+  bucket = "${var.project_name}-${var.environment}-${random_string.s3_suffix.result}"
 
   tags = {
-    Name    = "secure-aws-infra-bucket"
-    Project = "secure-aws-infrastructure"
+    Name        = "${var.project_name}-${var.environment}"
+    Environment = var.environment
+    Project     = var.project_name
   }
 }
 
-# Block ALL public access
-resource "aws_s3_bucket_public_access_block" "secure_bucket_block" {
-  bucket = aws_s3_bucket.secure_bucket.id
+########################################
+# Enforce Bucket Ownership
+########################################
+resource "aws_s3_bucket_ownership_controls" "app" {
+  bucket = aws_s3_bucket.app.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+########################################
+# Block ALL Public Access
+########################################
+resource "aws_s3_bucket_public_access_block" "app" {
+  bucket = aws_s3_bucket.app.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -24,68 +34,27 @@ resource "aws_s3_bucket_public_access_block" "secure_bucket_block" {
   restrict_public_buckets = true
 }
 
-# Default encryption using KMS CMK
+########################################
+# Enable Versioning
+########################################
+resource "aws_s3_bucket_versioning" "app" {
+  bucket = aws_s3_bucket.app.id
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "secure_bucket_encryption" {
-  bucket = aws_s3_bucket.secure_bucket.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+########################################
+# Server-Side Encryption (KMS)
+########################################
+resource "aws_s3_bucket_server_side_encryption_configuration" "app" {
+  bucket = aws_s3_bucket.app.id
 
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.project_kms.arn
+      kms_master_key_id = aws_kms_key.main.arn
     }
   }
 }
-
-# Bucket policy: allow EC2 role only
-
-data "aws_iam_policy_document" "bucket_policy" {
-  statement {
-    sid    = "AllowEC2RoleAccess"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [aws_iam_role.ec2_role.arn]
-    }
-
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-      "s3:ListBucket"
-    ]
-
-    resources = [
-      aws_s3_bucket.secure_bucket.arn,
-      "${aws_s3_bucket.secure_bucket.arn}/*"
-    ]
-  }
-
-  statement {
-    sid    = "DenyInsecureTransport"
-    effect = "Deny"
-
-    principals {
-      type        = "*"
-      identifiers = ["*"]
-    }
-
-    actions = ["s3:*"]
-    resources = [
-      aws_s3_bucket.secure_bucket.arn,
-      "${aws_s3_bucket.secure_bucket.arn}/*"
-    ]
-
-    condition {
-      test     = "Bool"
-      variable = "aws:SecureTransport"
-      values   = ["false"]
-    }
-  }
-}
-
-resource "aws_s3_bucket_policy" "secure_bucket_policy" {
-  bucket = aws_s3_bucket.secure_bucket.id
-  policy = data.aws_iam_policy_document.bucket_policy.json
-}
-
