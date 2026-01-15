@@ -37,69 +37,132 @@ resource "aws_instance" "public_vpn" {
   # USER DATA (SSM + WireGuard)
   ####################################
   user_data = <<-EOF
-    #!/bin/bash
-    set -e
+#!/bin/bash
+set -e
 
-    echo "=== Cloud-init started ==="
+echo "=== Cloud-init started ==="
 
-    ####################################
-    # Ensure SSM Agent (AL2023 safety)
-    ####################################
-    dnf install -y amazon-ssm-agent
-    systemctl enable amazon-ssm-agent
-    systemctl start amazon-ssm-agent
+############################
+# SSM Agent (AL2023)
+############################
+dnf install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
 
-    ####################################
-    # WireGuard Setup
-    ####################################
-    WG_INTERFACE="wg0"
-    WG_DIR="/etc/wireguard"
-    WG_PORT=51820
-    WG_SUBNET="10.8.0.0/24"
-    WG_SERVER_IP="10.8.0.1/24"
+############################
+# WireGuard variables
+############################
+WG_INTERFACE="wg0"
+WG_DIR="/etc/wireguard"
+CLIENT_DIR="/root/wireguard-clients"
+WG_PORT=51820
+WG_SUBNET="10.8.0.0/24"
+WG_SERVER_IP="10.8.0.1/24"
+CLIENT_IP="10.8.0.2/32"
 
-    dnf install -y wireguard-tools iptables-services
+############################
+# Install WireGuard
+############################
+dnf install -y wireguard-tools iptables-services
 
-    # Enable IP forwarding
-    cat <<SYSCTL >/etc/sysctl.d/99-wireguard.conf
-    net.ipv4.ip_forward = 1
-    SYSCTL
-    sysctl --system
+############################
+# Enable IP forwarding
+############################
+cat <<SYSCTL >/etc/sysctl.d/99-wireguard.conf
+net.ipv4.ip_forward = 1
+SYSCTL
+sysctl --system
 
-    # Detect primary interface
-    PRIMARY_IF=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
+############################
+# Detect primary interface
+############################
+PRIMARY_IF=$(ip route get 8.8.8.8 | awk '{print $5; exit}')
 
-    # Prepare WireGuard directory
-    mkdir -p $WG_DIR
-    chmod 700 $WG_DIR
-    cd $WG_DIR
+############################
+# Prepare directories
+############################
+mkdir -p $WG_DIR
+mkdir -p $CLIENT_DIR
+chmod 700 $WG_DIR
+chmod 700 $CLIENT_DIR
 
-    # Generate server keys (only once)
-    if [ ! -f server_private.key ]; then
-      wg genkey | tee server_private.key | wg pubkey > server_public.key
-      chmod 600 server_private.key
-    fi
+############################
+# Generate SERVER keys
+############################
+cd $WG_DIR
+wg genkey | tee server_private.key | wg pubkey > server_public.key
+chmod 600 server_private.key
 
-    SERVER_PRIVATE_KEY=$(cat server_private.key)
+SERVER_PRIVATE_KEY=$(cat server_private.key)
+SERVER_PUBLIC_KEY=$(cat server_public.key)
 
-    # Create wg0.conf
-    cat <<WGCONF >$WG_DIR/$WG_INTERFACE.conf
-    [Interface]
-    Address = $WG_SERVER_IP
-    ListenPort = $WG_PORT
-    PrivateKey = $SERVER_PRIVATE_KEY
+############################
+# Generate CLIENT keys
+############################
+cd $CLIENT_DIR
+wg genkey | tee client1_private.key | wg pubkey > client1_public.key
+chmod 600 client1_private.key
 
-    PostUp   = iptables -t nat -A POSTROUTING -s $WG_SUBNET -o $PRIMARY_IF -j MASQUERADE
-    PostDown = iptables -t nat -D POSTROUTING -s $WG_SUBNET -o $PRIMARY_IF -j MASQUERADE
-    WGCONF
+CLIENT_PRIVATE_KEY=$(cat client1_private.key)
+CLIENT_PUBLIC_KEY=$(cat client1_public.key)
 
-    chmod 600 $WG_DIR/$WG_INTERFACE.conf
+############################
+# Create wg0.conf (SERVER)
+############################
+cat <<WGCONF >$WG_DIR/$WG_INTERFACE.conf
+[Interface]
+Address = $WG_SERVER_IP
+ListenPort = $WG_PORT
+PrivateKey = $SERVER_PRIVATE_KEY
 
-    systemctl enable wg-quick@$WG_INTERFACE
-    systemctl restart wg-quick@$WG_INTERFACE
+PostUp   = iptables -t nat -A POSTROUTING -s $WG_SUBNET -o $PRIMARY_IF -j MASQUERADE
+PostDown = iptables -t nat -D POSTROUTING -s $WG_SUBNET -o $PRIMARY_IF -j MASQUERADE
 
-    echo "=== Cloud-init finished successfully ==="
-  EOF
+[Peer]
+PublicKey = $CLIENT_PUBLIC_KEY
+AllowedIPs = $CLIENT_IP
+WGCONF
+
+chmod 600 $WG_DIR/$WG_INTERFACE.conf
+
+############################
+# Create client1.conf
+############################
+
+# Fetch IMDSv2 token
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+# Fetch public IPv4 using token
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/public-ipv4)
+
+
+cat <<CLIENTCONF >$CLIENT_DIR/client1.conf
+[Interface]
+PrivateKey = $CLIENT_PRIVATE_KEY
+Address = 10.8.0.2/32
+DNS = 8.8.8.8
+
+[Peer]
+PublicKey = $SERVER_PUBLIC_KEY
+Endpoint = $PUBLIC_IP:$WG_PORT
+AllowedIPs = 10.0.0.0/16
+PersistentKeepalive = 25
+CLIENTCONF
+
+chmod 600 $CLIENT_DIR/client1.conf
+
+############################
+# Start WireGuard
+############################
+systemctl enable wg-quick@$WG_INTERFACE
+systemctl restart wg-quick@$WG_INTERFACE
+
+echo "=== WireGuard setup completed ==="
+echo "Client config located at: /root/wireguard-clients/client1.conf"
+EOF
+
 
   ####################################
   # Encrypted Root Volume
