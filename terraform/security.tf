@@ -44,14 +44,25 @@ resource "aws_security_group" "private" {
   vpc_id      = aws_vpc.main.id
 
   ####################################
-  # Allow traffic ONLY from VPN SG
+  # Allow traffic ONLY from WireGuard VPN
   ####################################
   ingress {
-    description     = "Allow traffic from VPN EC2 only"
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    security_groups = [aws_security_group.public.id]
+    description = "Allow traffic from WireGuard VPN clients"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["10.8.0.0/24"]
+  }
+
+  ####################################
+  # (Optional) Allow SSM only (443)
+  ####################################
+  ingress {
+    description = "Allow SSM"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ####################################
