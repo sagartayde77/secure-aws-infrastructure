@@ -1,4 +1,9 @@
 ########################################
+# Caller Identity (Required for KMS)
+########################################
+data "aws_caller_identity" "current" {}
+
+########################################
 # KMS Key (EBS + S3 Encryption)
 ########################################
 resource "aws_kms_key" "main" {
@@ -46,6 +51,11 @@ resource "aws_kms_key" "main" {
       }
     ]
   })
+
+  depends_on = [
+    aws_iam_role.public_ssm,
+    aws_iam_role.private_ec2
+  ]
 
   tags = {
     Name    = "${var.project_name}-kms-key"

@@ -2,7 +2,7 @@
 # S3 Bucket – Private Application Data
 ########################################
 resource "aws_s3_bucket" "app" {
-  bucket = "${var.project_name}-${var.environment}-${random_string.s3_suffix.result}"
+  bucket = "${var.project_name}-${var.environment}-${random_id.suffix.hex}"
 
   tags = {
     Name        = "${var.project_name}-${var.environment}"
@@ -57,4 +57,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "app" {
       kms_master_key_id = aws_kms_key.main.arn
     }
   }
+
+  depends_on = [aws_kms_key.main]
 }

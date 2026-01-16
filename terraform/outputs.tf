@@ -1,17 +1,28 @@
 ########################################
-# Public VPN / Bastion EC2 Outputs
+# Outputs
 ########################################
 
-output "public_vpn_public_ip" {
-  description = "Public IP address of the VPN / Bastion EC2 (used for initial access)"
+output "vpn_public_ip" {
+  description = "Public IP of WireGuard VPN EC2"
   value       = aws_instance.public_vpn.public_ip
 }
 
-########################################
-# Private Application EC2 Outputs
-########################################
+output "vpn_instance_id" {
+  description = "Instance ID of VPN EC2"
+  value       = aws_instance.public_vpn.id
+}
 
-output "private_app_instance_id" {
-  description = "Instance ID of the private application EC2"
+output "private_instance_id" {
+  description = "Instance ID of Private App EC2"
   value       = aws_instance.private_app.id
+}
+
+output "s3_bucket_name" {
+  description = "Private application S3 bucket"
+  value       = aws_s3_bucket.app.bucket
+}
+
+output "kms_key_arn" {
+  description = "KMS key ARN used for encryption"
+  value       = aws_kms_key.main.arn
 }

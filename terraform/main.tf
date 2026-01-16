@@ -38,7 +38,6 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidr
   availability_zone       = data.aws_availability_zones.available.names[0]
-
   map_public_ip_on_launch = true
 
   tags = {
@@ -52,13 +51,10 @@ resource "aws_subnet" "public" {
 # Private Subnet
 ########################################
 resource "aws_subnet" "private" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidr
-  availability_zone = data.aws_availability_zones.available.names[0]
-
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.private_subnet_cidr
+  availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = false
-
-  enable_dns64 = false
 
   tags = {
     Name        = "${var.project_name}-private-subnet"
@@ -121,6 +117,8 @@ resource "aws_route_table" "private" {
     cidr_block     = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat.id
   }
+
+  depends_on = [aws_nat_gateway.nat]
 
   tags = {
     Name    = "${var.project_name}-private-rt"

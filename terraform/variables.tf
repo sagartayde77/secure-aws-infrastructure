@@ -1,71 +1,82 @@
 ########################################
-# Global / Provider
+# Project
 ########################################
-
-variable "region" {
-  description = "AWS region where resources will be created"
-  type        = string
-}
-
 variable "project_name" {
-  description = "Project name used for resource naming"
-  type        = string
+  type = string
 }
 
 variable "environment" {
-  description = "Deployment environment (e.g. dev, test, prod)"
-  type        = string
+  type = string
+}
+
+########################################
+# AWS
+########################################
+variable "aws_region" {
+  type    = string
+  default = "ap-south-1"
 }
 
 ########################################
 # Networking
 ########################################
-
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
-  type        = string
+  type = string
 }
 
 variable "public_subnet_cidr" {
-  description = "CIDR block for the public subnet"
-  type        = string
+  type = string
 }
 
 variable "private_subnet_cidr" {
-  description = "CIDR block for the private subnet"
-  type        = string
+  type = string
 }
 
 ########################################
 # EC2
 ########################################
-
 variable "instance_type" {
-  description = "EC2 instance type for public VPN and private app EC2"
-  type        = string
-  default     = "t3.micro"
+  type    = string
+  default = "t2.micro"
 }
 
 ########################################
-# WireGuard VPN
+# VPN / WireGuard
 ########################################
-
 variable "wireguard_port" {
-  description = "UDP port for WireGuard VPN"
-  type        = number
-  default     = 51820
+  type    = number
+  default = 51820
 }
 
 variable "vpn_allowed_cidrs" {
-  description = "CIDR blocks allowed to access WireGuard VPN"
-  type        = list(string)
+  type = list(string)
+}
+
+variable "vpn_subnet_cidr" {
+  type    = string
+  default = "10.8.0.0/24"
 }
 
 ########################################
-# S3
+# Application
+########################################
+variable "app_port" {
+  type    = number
+  default = 80
+}
+
+########################################
+# WireGuard / VPN
 ########################################
 
-variable "s3_bucket_name" {
-  description = "Globally unique S3 bucket name for application data"
+variable "vpn_server_ip" {
   type        = string
+  description = "WireGuard server IP with CIDR"
+  default     = "10.8.0.1/24"
+}
+
+variable "vpn_client_ip" {
+  type        = string
+  description = "WireGuard client IP with CIDR"
+  default     = "10.8.0.2/32"
 }
