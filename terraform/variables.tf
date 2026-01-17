@@ -80,3 +80,4 @@ variable "vpn_client_ip" {
   description = "WireGuard client IP with CIDR"
   default     = "10.8.0.2/32"
 }
+
