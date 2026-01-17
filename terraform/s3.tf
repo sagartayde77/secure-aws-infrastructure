@@ -3,6 +3,7 @@
 ########################################
 resource "aws_s3_bucket" "app" {
   bucket = "${var.project_name}-${var.environment}-${random_id.suffix.hex}"
+  force_destroy = true #for temperery destroy
 
   tags = {
     Name        = "${var.project_name}-${var.environment}"
@@ -32,17 +33,6 @@ resource "aws_s3_bucket_public_access_block" "app" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-########################################
-# Enable Versioning
-########################################
-resource "aws_s3_bucket_versioning" "app" {
-  bucket = aws_s3_bucket.app.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
 }
 
 ########################################

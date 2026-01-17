@@ -82,17 +82,24 @@ resource "aws_iam_policy" "private_s3_access" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
+
+      # Bucket-level permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = aws_s3_bucket.app.arn
+      },
+
+      # Object-level permissions
       {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject",
-          "s3:ListBucket"
+          "s3:PutObject"
         ]
-        Resource = [
-          aws_s3_bucket.app.arn,
-          "${aws_s3_bucket.app.arn}/*"
-        ]
+        Resource = "${aws_s3_bucket.app.arn}/*"
       }
     ]
   })
