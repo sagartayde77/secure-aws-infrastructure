@@ -117,7 +117,7 @@ secure-aws-infra/
 
 ### 1. Clone the repository
 
-git clone https://github.com/your-username/secure-aws-infra.git
+git clone https://github.com/sagartayde77/secure-aws-infra.git
 cd secure-aws-infra/terraform
 2. Configure variables
 cp terraform.tfvars.example terraform.tfvars
